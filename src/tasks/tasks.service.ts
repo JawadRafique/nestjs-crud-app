@@ -3,59 +3,54 @@ https://docs.nestjs.com/providers#services
 */
 
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { Task, TaskStatus } from './tasks.model';
-import { v4 as uuid } from 'uuid'
+import { TaskStatus } from './tasks-status.enum';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { GetTasksFilterDto } from './dto/get-tasks-filter.dto';
-// import * as fs from 'fs/promises';
-
-// import {promises} from 'fs'
-
-import { promises as fsPromises } from 'fs';
-
+import { InjectRepository } from '@nestjs/typeorm';
+import { Task } from './entities/task.entity';
+import { Repository } from 'typeorm';
 
 @Injectable()
 export class TasksService {
-    private tasks: Task[] = [];
+    constructor(
+        @InjectRepository(Task)
+        private taskRepository: Repository<Task>,
+    ){}
 
-    getAllTasks(): Task[]  {
-        return this.tasks;
-    }
+    getAllTasks(): Promise<Task[]>{
+        return this.taskRepository.find();
+    } 
 
-    getFilteredTask(filteredDto: GetTasksFilterDto): Task[] {
+    async getFilteredTask(filteredDto: GetTasksFilterDto):  Promise<Task[]> {
         const {status, search} = filteredDto;
-        let tasks = this.getAllTasks();
-
+        const query = this.taskRepository.createQueryBuilder('task');
         if (status) {
-            tasks = tasks.filter((task) => task.status === status.toUpperCase())
+            // tasks =  tasks.filter((task) => task.status === status.toUpperCase())
+            query.andWhere('task.status = :status',  // :status is variable can be named anything but that same name to be used in object key (e.g :variable {variable: "Test Example"})
+            {status : status});
         }
 
         if (search) {
-            tasks = tasks.filter((task) => {
-                if(task.title.toLowerCase().includes(search.toLowerCase()) || task.description.toLowerCase().includes(search.toLowerCase())){
-                    return true;
-                }
-                return false;
-            })
+            query.andWhere('LOWER(task.title) LIKE LOWER(:search) OR LOWER(task.description) LIKE LOWER(:search)', 
+            { search: `%${search}%` });
         }
-
+        const tasks = await query.getMany();
         return tasks;
     }
 
-    createTask(createTaskDto: CreateTaskDto): Task {
+    async createTask(createTaskDto: CreateTaskDto): Promise<Task> {
         const {title, description} = createTaskDto;
-        const task: Task = {
-            id: uuid(),
+        const task = this.taskRepository.create({
             title,
             description,
             status: TaskStatus.OPEN
-        }
-        this.tasks.push(task)
+        })
+        await this.taskRepository.save(task)
         return task;
     }
 
-    getTaskById(id: string): Task {
-        const task = this.tasks.find((task) => task.id === id)
+    async getTaskById(id: number): Promise<Task> {
+        const task = await this.taskRepository.findOneBy({id})
 
         if(!task){
             throw new NotFoundException(`Task with ID ${id} not found`)
@@ -63,19 +58,14 @@ export class TasksService {
         return task
     }
 
-    deleteTaskById(id: string): string {
-        this.tasks = this.tasks.filter((task) => task.id !== id);
-        return `Task id: ${id} deleted`
+    async deleteTaskById(id: string): Promise<void> {
+        const result = await this.taskRepository.delete(id);
+        if(result.affected === 0) throw new NotFoundException(`Task with ID ${id} not found`)
     }
 
-    updateStatusById(id: string, status: TaskStatus): Task {
-        const task: Task = this.getTaskById(id);
-        task.status = status;
-        return task;
+    async updateStatusById(id: string, status: TaskStatus): Promise<void> {
+        const result = await this.taskRepository.update(id,{status})
+        if(result.affected === 0) throw new NotFoundException(`Task with ID ${id} not found`)
     }
 
-    fileReadAndWrite(): void {
-        fsPromises.appendFile('src/testtext/testtext.txt', '\r\nNodejs - File Write example FS ' + (new Date()));
-        console.log("task done")
-    }
  }
