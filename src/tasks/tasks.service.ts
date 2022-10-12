@@ -3,31 +3,31 @@ https://docs.nestjs.com/providers#services
 */
 
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { Task, TaskStatus } from './tasks.model';
+import { TaskType, TaskStatus } from './tasks.model';
 import { v4 as uuid } from 'uuid'
 import { CreateTaskDto } from './dto/create-task.dto';
 import { GetTasksFilterDto } from './dto/get-tasks-filter.dto';
-// import * as fs from 'fs/promises';
-
-// import {promises} from 'fs'
-
-import { promises as fsPromises } from 'fs';
-
+import { InjectRepository } from '@nestjs/typeorm';
+import { Task } from './task.entity';
+import { Repository, UpdateResult } from 'typeorm';
 
 @Injectable()
 export class TasksService {
-    private tasks: Task[] = [];
+    constructor(
+        @InjectRepository(Task)
+        private taskRepository: Repository<Task>,
+    ){}
 
-    getAllTasks(): Task[]  {
-        return this.tasks;
-    }
+    getAllTasks(): Promise<Task[]>{
+        return this.taskRepository.find();
+    } 
 
-    getFilteredTask(filteredDto: GetTasksFilterDto): Task[] {
+    async getFilteredTask(filteredDto: GetTasksFilterDto):  Promise<Task[]> {
         const {status, search} = filteredDto;
-        let tasks = this.getAllTasks();
+        let tasks = await this.getAllTasks();
 
         if (status) {
-            tasks = tasks.filter((task) => task.status === status.toUpperCase())
+            tasks =  tasks.filter((task) => task.status === status.toUpperCase())
         }
 
         if (search) {
@@ -42,7 +42,7 @@ export class TasksService {
         return tasks;
     }
 
-    createTask(createTaskDto: CreateTaskDto): Task {
+    async createTask(createTaskDto: CreateTaskDto): Promise<Task> {
         const {title, description} = createTaskDto;
         const task: Task = {
             id: uuid(),
@@ -50,12 +50,12 @@ export class TasksService {
             description,
             status: TaskStatus.OPEN
         }
-        this.tasks.push(task)
+        await this.taskRepository.insert(task)
         return task;
     }
 
-    getTaskById(id: string): Task {
-        const task = this.tasks.find((task) => task.id === id)
+    async getTaskById(id: string): Promise<Task> {
+        const task = await this.taskRepository.findOneBy({id})
 
         if(!task){
             throw new NotFoundException(`Task with ID ${id} not found`)
@@ -63,19 +63,13 @@ export class TasksService {
         return task
     }
 
-    deleteTaskById(id: string): string {
-        this.tasks = this.tasks.filter((task) => task.id !== id);
+    async deleteTaskById(id: string): Promise<string> {
+        await this.taskRepository.delete(id);
         return `Task id: ${id} deleted`
     }
 
-    updateStatusById(id: string, status: TaskStatus): Task {
-        const task: Task = this.getTaskById(id);
-        task.status = status;
-        return task;
+    async updateStatusById(id: string, status: TaskStatus): Promise<void> {
+        await this.taskRepository.update(id,{status})
     }
 
-    fileReadAndWrite(): void {
-        fsPromises.appendFile('src/testtext/testtext.txt', '\r\nNodejs - File Write example FS ' + (new Date()));
-        console.log("task done")
-    }
  }
