@@ -6,7 +6,7 @@ https://docs.nestjs.com/modules
 */
 
 import { Module } from "@nestjs/common";
-import { Task } from './task.entity';
+import { Task } from './entities/task.entity';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Task])],
