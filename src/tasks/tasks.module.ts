@@ -7,9 +7,10 @@ https://docs.nestjs.com/modules
 
 import { Module } from "@nestjs/common";
 import { Task } from './entities/task.entity';
+import { AuthModule } from 'src/auth/auth.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Task])],
+  imports: [TypeOrmModule.forFeature([Task]), AuthModule],
   controllers: [TasksController],
   providers: [TasksService],
 })
