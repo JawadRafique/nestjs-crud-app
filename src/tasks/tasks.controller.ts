@@ -1,22 +1,31 @@
+import { Workbook } from 'exceljs';
 import { CreateTaskDto } from './dto/create-task.dto';
 /*
 https://docs.nestjs.com/controllers#controllers
 */
 
-import { Controller, Get, Post, Body, Param, Delete, Query, Patch, UseGuards } from '@nestjs/common';
-import { TaskStatus } from './tasks-status.enum';
+import { Controller, Get, Post, Body, Param, Delete, Query, Patch,Res, UseGuards, Header, BadRequestException } from '@nestjs/common';
 import { TasksService } from './tasks.service';
 import { GetTasksFilterDto } from './dto/get-tasks-filter.dto';
 import { UpdateTaskStatusDto } from './dto/update-task.dto';
 import { Task } from './entities/task.entity';
 import {AuthGuard} from '@nestjs/passport'
-import { GetUser } from 'src/auth/get-user.decorator';
-import { User } from 'src/auth/entities/user.entity';
+import { GetUser } from '../auth/get-user.decorator';
+import { User } from '../auth/entities/user.entity';
+import { Response } from 'express';
+import * as tmp from 'tmp'
 
 @Controller('tasks')
-@UseGuards(AuthGuard())
+// @UseGuards(AuthGuard())
 export class TasksController {
     constructor(private tasksService: TasksService) {}
+
+    @Get('/download')
+    @Header('Content-Type', 'text/xlsx')
+    async downloadAllTask(@Res() res: Response) {
+        let tasks = await this.tasksService.downloadTask();        
+        res.download(`${tasks}`)
+    }
 
     @Get()
     getTasks(@GetUser() user: User, @Query() filteredDto: GetTasksFilterDto):  Promise<Task[]>  {
@@ -46,4 +55,5 @@ export class TasksController {
         const {status} = updateTaskStatus
         return this.tasksService.updateStatusById(id, status);
     }
+    
 }
