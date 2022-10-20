@@ -1,25 +1,25 @@
-/*
-https://docs.nestjs.com/providers#services
-*/
-
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {  Injectable, NotFoundException } from '@nestjs/common';
 import { TaskStatus } from './tasks-status.enum';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { GetTasksFilterDto } from './dto/get-tasks-filter.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Task } from './entities/task.entity';
 import { Repository } from 'typeorm';
-import { User } from 'src/auth/entities/user.entity';
+import { User } from '../auth/entities/user.entity';
+import { ExcelService } from './../excel/excel.service';
+import { Cron, CronExpression } from '@nestjs/schedule';
 
 @Injectable()
 export class TasksService {
     constructor(
         @InjectRepository(Task)
         private taskRepository: Repository<Task>,
+        private excelService: ExcelService,
     ){}
 
-    getAllTasks(): Promise<Task[]>{
-        return this.taskRepository.find();
+    async getAllTasks(): Promise<Task[]>{
+        const tasks = await this.taskRepository.find();
+        return tasks;
     } 
 
     async getTasks(filteredDto: GetTasksFilterDto, user: User):  Promise<Task[]> {
@@ -69,6 +69,18 @@ export class TasksService {
     async  updateStatusById(id: string, status: TaskStatus): Promise<void> {
         const result = await this.taskRepository.update(id,{status})
         if(result.affected === 0) throw new NotFoundException(`Task with ID ${id} not found`)
+    }
+
+    async downloadTask() {
+        const tasks = await this.getAllTasks(); 
+        const File = await this.excelService.downloadExcel(tasks)
+        return File
+    }
+
+    // Cron Job added for 30 seconds
+    @Cron(CronExpression.EVERY_30_SECONDS)
+    handleCron(){
+        console.log("Every 30 Seconds")
     }
 
  }
